@@ -1,0 +1,47 @@
+name: Build & Deploy
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:  # permite rodar manualmente
+
+jobs:
+  release_package:
+    name: Create Release Package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Create zip of repo
+        run: |
+          zip -r release.zip ./*
+      
+      - name: Upload artifact (zip)
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-package
+          path: release.zip
+
+  deploy_pages:
+    name: Deploy to GitHub Pages
+    needs: release_package   # só roda após o job acima
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload site content
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .  # raiz do repo (tem que conter index.html)
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
