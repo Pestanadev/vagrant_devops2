@@ -2,8 +2,8 @@ name: Build & Deploy
 
 on:
   push:
-    branches: [ "main" ]
-  workflow_dispatch:
+    tags:
+      - 'v*'   # Exemplo: v1.0.0
 
 jobs:
   release_package:
@@ -16,15 +16,48 @@ jobs:
       - name: Create zip of repo
         run: zip -r release.zip ./*
 
-      - name: Upload artifact (zip)
+      - name: Upload artifact for next job
         uses: actions/upload-artifact@v4
         with:
-          name: release-package
+          name: release-zip
           path: release.zip
+
+  create_release:
+    name: Create GitHub Release
+    needs: release_package
+    runs-on: self-hosted
+    permissions:
+      contents: write
+    steps:
+      - name: Download ZIP artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-zip
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: release.zip
+          asset_name: release.zip
+          asset_content_type: application/zip
 
   deploy_pages:
     name: Deploy to GitHub Pages
-    needs: release_package
+    needs: create_release
     runs-on: self-hosted
     permissions:
       contents: read
